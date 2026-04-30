@@ -10,7 +10,7 @@ from email.message import EmailMessage
 URL = "https://douconsultapublica.manus.space"
 
 
-# 🔍 1. Extrair itens (título + link)
+# 🔍 1. Extrair itens (orgão + título + link)
 def rodar_busca():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -26,10 +26,33 @@ def rodar_busca():
         elementos = page.locator("a[href*='in.gov.br']").all()
 
         itens = []
+        vistos = set()  # evitar duplicados
+
         for el in elementos:
-            titulo = el.inner_text()
+            texto = el.inner_text().strip()
             link = el.get_attribute("href")
-            itens.append((titulo, link))
+
+            if not link or link in vistos:
+                continue
+
+            vistos.add(link)
+
+            linhas = [l.strip() for l in texto.split("\n") if l.strip()]
+
+            if len(linhas) >= 2:
+                orgao = linhas[0]
+                titulo = " ".join(linhas[1:])
+            else:
+                orgao = "Órgão não identificado"
+                titulo = texto
+
+            # filtro opcional (mantém só consultas públicas)
+            if "consulta pública" in titulo.lower():
+                itens.append({
+                    "orgao": orgao,
+                    "titulo": titulo,
+                    "link": link
+                })
 
         browser.close()
 
@@ -54,12 +77,20 @@ def montar_html(itens):
             }}
             .item {{
                 margin-bottom: 20px;
-                padding: 10px;
-                border-bottom: 1px solid #ddd;
+                padding: 12px;
+                border-left: 4px solid #1a3c6e;
+                background-color: #f9f9f9;
+            }}
+            .orgao {{
+                font-size: 11px;
+                color: #666;
+                text-transform: uppercase;
+                margin-bottom: 5px;
             }}
             .titulo {{
                 font-weight: bold;
                 font-size: 14px;
+                margin-bottom: 5px;
             }}
             .link {{
                 font-size: 12px;
@@ -70,15 +101,19 @@ def montar_html(itens):
     </head>
     <body>
         <h1>Monitoramento de Consultas Públicas – DOU</h1>
-        <p>Data: {data}</p>
+        <p><b>Data:</b> {data}</p>
         <hr>
     """
 
-    for i, (titulo, link) in enumerate(itens, 1):
+    if not itens:
+        html += "<p>Nenhuma consulta pública encontrada.</p>"
+
+    for i, item in enumerate(itens, 1):
         html += f"""
         <div class="item">
-            <div class="titulo">{i}. {titulo}</div>
-            <a class="link" href="{link}">Acessar no DOU</a>
+            <div class="orgao">{item['orgao']}</div>
+            <div class="titulo">{i}. {item['titulo']}</div>
+            <a class="link" href="{item['link']}">Acessar no DOU</a>
         </div>
         """
 
