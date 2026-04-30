@@ -25,19 +25,21 @@ def rodar_busca():
         return html
 
 
+import smtplib
+from email.mime.text import MIMEText
+
 def enviar_email(html):
     email = os.getenv("EMAIL_USER")
     senha = os.getenv("EMAIL_PASS")
 
-    yag = yagmail.SMTP(email, senha)
+    msg = MIMEText(html, "html")
+    msg["Subject"] = "DOU - Consultas Públicas"
+    msg["From"] = email
+    msg["To"] = "thaissalzer@gmail.com"
 
-    hoje = datetime.today().strftime("%d/%m/%Y")
-
-    yag.send(
-        to="thaissalzer@gmail.com",
-        subject=f"DOU - Consultas Públicas ({hoje})",
-        contents=html
-    )
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(email, senha)
+        server.send_message(msg)
 
 
 def job():
