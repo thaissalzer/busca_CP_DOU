@@ -10,7 +10,7 @@ from email.message import EmailMessage
 URL = "https://douconsultapublica.manus.space"
 
 
-# 🔍 1. Extrair itens (orgão + título + link)
+# 🔍 1. Extrair TODOS os itens (sem filtro)
 def rodar_busca():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -26,7 +26,7 @@ def rodar_busca():
         elementos = page.locator("a[href*='in.gov.br']").all()
 
         itens = []
-        vistos = set()  # evitar duplicados
+        vistos = set()
 
         for el in elementos:
             texto = el.inner_text().strip()
@@ -37,29 +37,28 @@ def rodar_busca():
 
             vistos.add(link)
 
+            # tentativa de separar órgão e título
             linhas = [l.strip() for l in texto.split("\n") if l.strip()]
 
             if len(linhas) >= 2:
                 orgao = linhas[0]
                 titulo = " ".join(linhas[1:])
             else:
-                orgao = "Órgão não identificado"
+                orgao = ""
                 titulo = texto
 
-            # filtro opcional (mantém só consultas públicas)
-            if "consulta pública" in titulo.lower():
-                itens.append({
-                    "orgao": orgao,
-                    "titulo": titulo,
-                    "link": link
-                })
+            itens.append({
+                "orgao": orgao,
+                "titulo": titulo,
+                "link": link
+            })
 
         browser.close()
 
         return itens
 
 
-# 🎨 2. Montar HTML bonito (com CSS)
+# 🎨 2. Montar HTML bonito
 def montar_html(itens):
     data = datetime.today().strftime("%d/%m/%Y")
 
@@ -106,12 +105,12 @@ def montar_html(itens):
     """
 
     if not itens:
-        html += "<p>Nenhuma consulta pública encontrada.</p>"
+        html += "<p>Nenhum resultado encontrado.</p>"
 
     for i, item in enumerate(itens, 1):
         html += f"""
         <div class="item">
-            <div class="orgao">{item['orgao']}</div>
+            {"<div class='orgao'>" + item['orgao'] + "</div>" if item['orgao'] else ""}
             <div class="titulo">{i}. {item['titulo']}</div>
             <a class="link" href="{item['link']}">Acessar no DOU</a>
         </div>
