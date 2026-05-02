@@ -23,40 +23,31 @@ def rodar_busca():
         print("Aguardando resultados...")
         time.sleep(40)
 
-        elementos = page.locator("a[href*='in.gov.br']").all()
+        # 👇 pega o CARD completo (não só link)
+        cards = page.locator("div:has-text('Ver publicação completa no DOU')").all()
 
         itens = []
         vistos = set()
 
-        for el in elementos:
-            texto = el.inner_text().strip()
-            link = el.get_attribute("href")
+        for card in cards:
+            texto = card.inner_text().strip()
 
-            if not link or link in vistos:
+            link_el = card.locator("a[href*='in.gov.br']")
+            link = link_el.first.get_attribute("href") if link_el.count() > 0 else ""
+
+            if link in vistos:
                 continue
 
             vistos.add(link)
 
-            # tentativa de separar órgão e título
-            linhas = [l.strip() for l in texto.split("\n") if l.strip()]
-
-            if len(linhas) >= 2:
-                orgao = linhas[0]
-                titulo = " ".join(linhas[1:])
-            else:
-                orgao = ""
-                titulo = texto
-
             itens.append({
-                "orgao": orgao,
-                "titulo": titulo,
+                "texto": texto,
                 "link": link
             })
 
         browser.close()
 
         return itens
-
 
 # 🎨 2. Montar HTML bonito
 def montar_html(itens):
@@ -69,31 +60,27 @@ def montar_html(itens):
             body {{
                 font-family: Arial, sans-serif;
                 margin: 30px;
-                color: #333;
+                background-color: #f5f5f5;
             }}
             h1 {{
                 color: #1a3c6e;
             }}
-            .item {{
+            .card {{
+                background: white;
+                border-radius: 8px;
+                padding: 15px;
                 margin-bottom: 20px;
-                padding: 12px;
-                border-left: 4px solid #1a3c6e;
-                background-color: #f9f9f9;
+                border-left: 6px solid #1a3c6e;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             }}
-            .orgao {{
-                font-size: 11px;
-                color: #666;
-                text-transform: uppercase;
-                margin-bottom: 5px;
-            }}
-            .titulo {{
-                font-weight: bold;
-                font-size: 14px;
-                margin-bottom: 5px;
+            .texto {{
+                font-size: 13px;
+                white-space: pre-line;
+                margin-bottom: 10px;
             }}
             .link {{
-                font-size: 12px;
-                color: #0066cc;
+                color: #007bff;
+                font-weight: bold;
                 text-decoration: none;
             }}
         </style>
@@ -107,19 +94,17 @@ def montar_html(itens):
     if not itens:
         html += "<p>Nenhum resultado encontrado.</p>"
 
-    for i, item in enumerate(itens, 1):
+    for item in itens:
         html += f"""
-        <div class="item">
-            {"<div class='orgao'>" + item['orgao'] + "</div>" if item['orgao'] else ""}
-            <div class="titulo">{i}. {item['titulo']}</div>
-            <a class="link" href="{item['link']}">Acessar no DOU</a>
+        <div class="card">
+            <div class="texto">{item['texto']}</div>
+            <a class="link" href="{item['link']}">Ver publicação completa no DOU</a>
         </div>
         """
 
     html += "</body></html>"
 
     return html
-
 
 # 📄 3. Gerar PDF
 def gerar_pdf(html):
