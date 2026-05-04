@@ -10,7 +10,7 @@ from email.message import EmailMessage
 URL = "https://douconsultapublica.manus.space"
 
 
-# 🔍 1. Extrair TODOS os itens (sem filtro)
+# 🔍 1. Extrair cards completos
 def rodar_busca():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -30,7 +30,6 @@ def rodar_busca():
         for card in cards:
             texto = card.inner_text().strip()
 
-            # remove lixo do topo
             if "consultas públicas encontradas" in texto.lower():
                 continue
 
@@ -44,24 +43,30 @@ def rodar_busca():
 
             linhas = [l.strip() for l in texto.split("\n") if l.strip()]
 
-            # 🔥 extração estruturada
             secao = ""
             titulo = ""
             orgao = ""
             descricao = ""
 
-            for i, l in enumerate(linhas):
-                if "seção" in l.lower():
+            for l in linhas:
+                if "seção" in l.lower() and not secao:
                     secao = l
 
-                elif l.isupper() and len(l) > 10:
+                elif l.isupper() and len(l) > 8 and not titulo:
                     titulo = l
 
-                elif "ministério" in l.lower() or "agência" in l.lower():
+                elif ("ministério" in l.lower() or "agência" in l.lower()) and not orgao:
                     orgao = l
 
                 elif titulo and not descricao:
                     descricao = l
+
+            # fallback (evita vazio)
+            if not titulo and linhas:
+                titulo = linhas[0]
+
+            if not descricao and len(linhas) > 1:
+                descricao = linhas[1]
 
             itens.append({
                 "secao": secao,
@@ -73,7 +78,9 @@ def rodar_busca():
 
         browser.close()
         return itens
-# 🎨 2. Montar HTML bonito
+
+
+# 🎨 2. Montar HTML (layout limpo)
 def montar_html(itens):
     data = datetime.today().strftime("%d/%m/%Y")
 
@@ -130,6 +137,9 @@ def montar_html(itens):
         <hr>
     """
 
+    if not itens:
+        html += "<p>Nenhum resultado encontrado.</p>"
+
     for item in itens:
         html += f"""
         <div class="card">
@@ -144,7 +154,13 @@ def montar_html(itens):
     html += "</body></html>"
     return html
 
-# 📩 4. Enviar email com PDF
+
+# 📄 3. Gerar PDF (CORRIGIDO)
+def gerar_pdf(html):
+    HTML(string=html).write_pdf("dou.pdf")
+
+
+# 📩 4. Enviar email
 def enviar_email():
     email = os.getenv("EMAIL_USER")
     senha = os.getenv("EMAIL_PASS")
@@ -169,7 +185,7 @@ def enviar_email():
         server.send_message(msg)
 
 
-# 🚀 Fluxo principal
+# 🚀 Execução
 def job():
     itens = rodar_busca()
     html = montar_html(itens)
