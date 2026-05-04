@@ -17,14 +17,12 @@ def rodar_busca():
         page = browser.new_page()
 
         page.goto(URL)
-
         page.click("text=Buscar no DOU")
 
         print("Aguardando resultados...")
         time.sleep(40)
 
-        # 👇 pega o CARD completo (não só link)
-        cards = page.locator("div:has-text('Ver publicação completa no DOU')").all()
+        cards = page.locator("div:has(a[href*='in.gov.br'])").all()
 
         itens = []
         vistos = set()
@@ -32,23 +30,49 @@ def rodar_busca():
         for card in cards:
             texto = card.inner_text().strip()
 
+            # remove lixo do topo
+            if "consultas públicas encontradas" in texto.lower():
+                continue
+
             link_el = card.locator("a[href*='in.gov.br']")
             link = link_el.first.get_attribute("href") if link_el.count() > 0 else ""
 
-            if link in vistos:
+            if not link or link in vistos:
                 continue
 
             vistos.add(link)
 
+            linhas = [l.strip() for l in texto.split("\n") if l.strip()]
+
+            # 🔥 extração estruturada
+            secao = ""
+            titulo = ""
+            orgao = ""
+            descricao = ""
+
+            for i, l in enumerate(linhas):
+                if "seção" in l.lower():
+                    secao = l
+
+                elif l.isupper() and len(l) > 10:
+                    titulo = l
+
+                elif "ministério" in l.lower() or "agência" in l.lower():
+                    orgao = l
+
+                elif titulo and not descricao:
+                    descricao = l
+
             itens.append({
-                "texto": texto,
+                "secao": secao,
+                "titulo": titulo,
+                "orgao": orgao,
+                "descricao": descricao,
                 "link": link
             })
 
         browser.close()
-
         return itens
-
 # 🎨 2. Montar HTML bonito
 def montar_html(itens):
     data = datetime.today().strftime("%d/%m/%Y")
@@ -67,15 +91,30 @@ def montar_html(itens):
             }}
             .card {{
                 background: white;
-                border-radius: 8px;
+                border-radius: 10px;
                 padding: 15px;
                 margin-bottom: 20px;
                 border-left: 6px solid #1a3c6e;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             }}
-            .texto {{
+            .secao {{
+                font-size: 11px;
+                color: #888;
+                margin-bottom: 5px;
+            }}
+            .titulo {{
+                font-weight: bold;
+                font-size: 16px;
+                margin-bottom: 8px;
+            }}
+            .orgao {{
+                font-size: 12px;
+                color: #555;
+                margin-bottom: 8px;
+            }}
+            .descricao {{
                 font-size: 13px;
-                white-space: pre-line;
+                color: #333;
                 margin-bottom: 10px;
             }}
             .link {{
@@ -91,25 +130,19 @@ def montar_html(itens):
         <hr>
     """
 
-    if not itens:
-        html += "<p>Nenhum resultado encontrado.</p>"
-
     for item in itens:
         html += f"""
         <div class="card">
-            <div class="texto">{item['texto']}</div>
+            <div class="secao">{item['secao']}</div>
+            <div class="titulo">{item['titulo']}</div>
+            <div class="orgao">{item['orgao']}</div>
+            <div class="descricao">{item['descricao']}</div>
             <a class="link" href="{item['link']}">Ver publicação completa no DOU</a>
         </div>
         """
 
     html += "</body></html>"
-
     return html
-
-# 📄 3. Gerar PDF
-def gerar_pdf(html):
-    HTML(string=html).write_pdf("dou.pdf")
-
 
 # 📩 4. Enviar email com PDF
 def enviar_email():
