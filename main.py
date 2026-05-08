@@ -165,10 +165,17 @@ def enviar_email():
     email = os.getenv("EMAIL_USER")
     senha = os.getenv("EMAIL_PASS")
 
+
     msg = EmailMessage()
     msg["Subject"] = "DOU - Consultas Públicas"
     msg["From"] = email
-    msg["To"] = "thaissalzer@gmail.com"
+
+    destinatarios = [
+        "thaissalzer@gmail.com",
+        "gleyanne.silva@economia.gov.br"
+    ]
+
+    msg["To"] = ", ".join(destinatarios)
 
     msg.set_content("Segue relatório em PDF.")
 
@@ -183,6 +190,9 @@ def enviar_email():
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(email, senha)
         server.send_message(msg)
+
+
+
 
 
 # 🚀 Execução
