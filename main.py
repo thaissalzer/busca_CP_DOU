@@ -172,7 +172,7 @@ def enviar_email():
 
     destinatarios = [
         "thaissalzer@gmail.com",
-        "gleyanne.silva@economia.gov.br"
+        "gleyanne.silva@fazenda.gov.br"
     ]
 
     msg["To"] = ", ".join(destinatarios)
